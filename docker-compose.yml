@@ -1,0 +1,13 @@
+version: "3.8"
+
+services:
+  list-products-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: list-products-service
+    ports:
+      - "4010:4010"
+    env_file:
+      - .env
+    restart: always
