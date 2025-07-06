@@ -1,4 +1,4 @@
-name: 🚀 Build & Deploy Search Products Service to EC2
+name: 🚀 Build & Deploy List Products Service to EC2
 
 on:
   push:
@@ -7,36 +7,53 @@ on:
 
 jobs:
   build-and-deploy:
+    name: 🐳 Build & Push Docker Image + ☁️ Deploy to EC2
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v3
+
       - uses: docker/setup-buildx-action@v3
+
       - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
+
       - run: |
-          docker build -t agente47/search-products-service:latest .
-          docker push agente47/search-products-service:latest
+          docker build -t agente47/list-products-service:latest .
+          docker push agente47/list-products-service:latest
+
       - uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_KEY }}
           script: |
-            cat <<EOF | sudo tee /home/ec2-user/.env.search-products-service
+            echo "🛠️ Instalando Docker y Docker Compose si no existen..."
+            if ! command -v docker &> /dev/null; then
+              sudo yum update -y
+              sudo yum install -y docker
+              sudo systemctl start docker
+              sudo systemctl enable docker
+              sudo usermod -aG docker ec2-user
+            fi
+
+            echo "⚙️ Configurando variables de entorno..."
+            cat <<EOF | sudo tee /home/ec2-user/.env.list-products-service
             MONGO_URI=mongodb://serious:123456@23.20.252.222:27017/products_db?authSource=admin
             DB_NAME=products_db
             JWT_SECRET=mysecretkey1234
             EOF
 
-            sudo docker pull agente47/search-products-service:latest
+            echo "📦 Desplegando contenedor..."
+            sudo docker pull agente47/list-products-service:latest
             sudo docker network inspect my_global_network >/dev/null 2>&1 || \
               sudo docker network create my_global_network
-            sudo docker stop search-products-service || true
-            sudo docker rm search-products-service || true
-            sudo docker run -d --name search-products-service \
-              --env-file /home/ec2-user/.env.search-products-service \
-              -p 4012:4012 \
+            sudo docker stop list-products-service || true
+            sudo docker rm list-products-service || true
+            sudo docker run -d --name list-products-service \
+              --env-file /home/ec2-user/.env.list-products-service \
+              -p 4010:4010 \
               --network my_global_network \
-              agente47/search-products-service:latest
+              agente47/list-products-service:latest
